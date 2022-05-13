@@ -10,7 +10,7 @@
 
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
@@ -53,21 +53,21 @@
 	The fourth digit is ignored. The instruction code is made 4-bit. 
 	The first 3 bits encode 8 "Krokha" instructions.  Here is list:
 	+----+--------------------------------+-------------------------+
-	|CODE|OPERATION NAME 				     |OPERATION CONTENT        |
+	|CODE|OPERATION NAME                  |OPERATION CONTENT        |
 	+----+--------------------------------+-------------------------+
-	|000 |copy 							        |A1 ==> A3			       |
-	|001 |addition 						     |A1 + A2 ==> A3		       |
-	|010 |division 						     |A1 / A2 ==> A3			    |
-	|011 |subtraction 					     |A1 - A2 ==> A3			    |
-	|100 |conditional transition by equal |if A1=A2 transfer to A3	 |
-	|101 |multiplication 				     |A1 * A2 ==> A3  			 |
-	|110 |conditional transition by above |if A1>A2 transfer to A3	 |
-	|111 |output and stop 				     |output A1, A2, A3; stop	 |
+	|000 |copy                            |A1 ==> A3                |
+	|001 |addition                        |A1 + A2 ==> A3           |
+	|010 |division                        |A1 / A2 ==> A3           |
+	|011 |subtraction                     |A1 - A2 ==> A3           |
+	|100 |conditional transition by equal |if A1=A2 transfer to A3  |
+	|101 |multiplication                  |A1 * A2 ==> A3           |
+	|110 |conditional transition by above |if A1>A2 transfer to A3  |
+	|111 |output and stop                 |output A1, A2, A3; stop  |
 	+----+--------------------------------+-------------------------+
 	The TINYAC  operates with integers. Like the commands, the numbers 
 	are 16-bit. Obviously, the maximum number that the TINYAC is still 
-	able to place in its memory is 32767 and the minimum number	is -32768. 
-	If the result is larger, it goes beyond the 16-bit machine 	word and 
+	able to place in its memory is 32767 and the minimum number is -32768. 
+	If the result is larger, it goes beyond the 16-bit machine word and 
 	cannot be stored correctly and overflow indication is established. 
 	Overflow is an emergency situation and leads to the further incorrect 
 	program execution.
@@ -112,16 +112,16 @@
 	If p1 is skipped the first assembling address is considered 0, else
 	it is considered equal to p1.
 	+----+--------------------------------+-------------------------+
-	|CODE|OPERATION NAME 				     |ASSEMBLER MNEMONIC       |
+	|CODE|OPERATION NAME                  |ASSEMBLER MNEMONIC       |
 	+----+--------------------------------+-------------------------+
-	|000 |copy 				      			  |COPY     			       |
-	|001 |addition 				   		  |ADD           		       |
-	|010 |division 					   	  |DIV           		       |
-	|011 |subtraction 					     |SUB           			    |
-	|100 |conditional transition by equal |TREQ                   	 |
-	|101 |multiplication 				     |MPY             			 |
-	|110 |conditional transition by above |TRGT                   	 |
-	|111 |output and stop 				     |PRST                   	 |
+	|000 |copy                            |COPY                     |
+	|001 |addition                        |ADD                      |
+	|010 |division                        |DIV                      |
+	|011 |subtraction                     |SUB                      |
+	|100 |conditional transition by equal |TREQ                     |
+	|101 |multiplication                  |MPY                      |
+	|110 |conditional transition by above |TRGT                     |
+	|111 |output and stop                 |PRST                     |
 	| -  |define decimal value            |DEFD                     |
 	| -  |define hexadecimal value        |DEFH                     |  
 	+----+--------------------------------+-------------------------+
