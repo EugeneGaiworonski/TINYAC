@@ -16,7 +16,8 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see https://www.gnu.org/licenses/.
 	
-	Date: 09.05.22 
+	Date: 1.12.21
+	      09.05.22 
 	
 	Description: Virtual Training Automatic Computing Machine TINYAC.
 	
