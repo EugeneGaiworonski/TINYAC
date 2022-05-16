@@ -140,3 +140,4 @@
 	R - viewing internal registers and indications.
 	S [p1] - editing values in memory from p1 or 0.
 	H p1 p2- computing sum and difference of values p1 and p2.
+	T - execute one command (Trace mode).
