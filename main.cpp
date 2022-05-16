@@ -18,8 +18,9 @@
     along with this program.  If not, see https://www.gnu.org/licenses/.
 	
 	Date: 
-	1.12.21
-	09.05.22 
+	1.12.21  - Alpha
+	09.05.22 - Beta
+	15.05.22 - First program executed successfully! 
 	
 	Description: Virtual Training Automatic Computing Machine TINYAC.
 	
@@ -142,6 +143,7 @@
 	R - viewing internal registers and indications.
 	S [p1] - editing values in memory from p1 or 0.
 	H p1 p2- computing sum and difference of values p1 and p2.
+	T - execute one command (Trace mode).
 	
 */
 
@@ -150,12 +152,15 @@
 #include <iomanip>
 #include <string>
 #include <vector>
+#include <array>
 #include <cctype>
 #include <cstdio>
 #include <algorithm>
 #include <windows.h>
+#include <limits.h>
 
 #define Word int16_t
+#define Byte int8_t
 #define MEMSIZE 8
 #define LASTADDR 7
 
@@ -168,6 +173,24 @@
 #define cmTRGT 6 // trace if greater
 #define cmPRST 7 // print & stop
 
+typedef union {
+	struct {
+		int8_t byte3 : 4;
+		int8_t byte2 : 4;
+		int8_t byte1 : 4;
+		int8_t byte0 : 4;
+	};
+	Word word;
+} _WORD;
+
+void print_char(char c) {
+	unsigned char mask = 128;
+	int i;
+	for(i = 0; i < 8; ++i){
+		printf("%s",((mask & c)?"1":"0"));
+		mask >>= 1;
+	}
+}
 
 class TINYAC {
 	public:
@@ -176,6 +199,7 @@ class TINYAC {
 		Word IR; //instruction register
 		Word IP; //instruction pointer
 		Word memory[MEMSIZE];
+		Word OP1;
 		
 		std::string dir;
 		std::vector<std::string> parsedDir; //разобранная команда
@@ -185,6 +209,7 @@ class TINYAC {
 		void DumpMem();
 		void LoadTest();
 		void Do();
+		int  Step();
 		void Console();
 		void ParseDir();
 		void Assemble();
@@ -198,6 +223,7 @@ class TINYAC {
 		void ViewRegs();
 		void EditMem();
 		void Compute();
+		void Trace();
 };
 
 int main(int argc, char** argv) {
@@ -222,6 +248,85 @@ TINYAC::TINYAC() {
 	D0 = false;	
 	IR = 0;
 	IP = 0;
+}
+
+int TINYAC::Step() {
+	std::vector<int8_t> parsedWord;
+	_WORD wd;
+	
+	IR = memory[IP];
+	IP++; if(IP > LASTADDR) IP = 0; // достигли конца памяти, переходим на 0
+	wd.word = IR;
+	parsedWord.clear();
+    parsedWord.push_back(wd.byte0); 
+	parsedWord.push_back(wd.byte1); 
+	parsedWord.push_back(wd.byte2); 
+	parsedWord.push_back(wd.byte3);
+	switch (wd.byte0) {
+		case cmCOPY:
+			memory[wd.byte3] = memory[wd.byte1];
+			break;
+		case cmADD: 
+			if (((memory[wd.byte2] > 0) && (memory[wd.byte1] > (SHRT_MAX - memory[wd.byte2]))) || ((memory[wd.byte2] < 0) && (memory[wd.byte1] < (SHRT_MIN - memory[wd.byte2])))) {
+    			OV = true;
+  			} 
+			else memory[wd.byte3] = memory[wd.byte1] + memory[wd.byte2];
+			break;
+		case cmDIV:
+			if (memory[wd.byte2]==0) D0 = true;
+			else if ((memory[wd.byte2] == 0) || ((memory[wd.byte1] == SHRT_MIN) && (memory[wd.byte2] == -1))) {
+    			OV = true;
+  			} 
+			else memory[wd.byte3] = memory[wd.byte1] / memory[wd.byte2];
+			break;
+		case cmSUB:
+			if ((memory[wd.byte2] > 0 && memory[wd.byte1] < SHRT_MIN + memory[wd.byte2]) || (memory[wd.byte2] < 0 && memory[wd.byte1] > SHRT_MAX + memory[wd.byte2])) {
+				OV = true;
+			} 
+			else memory[wd.byte3] = memory[wd.byte1] - memory[wd.byte2];
+			break;
+		case cmTREQ: 
+			if (memory[wd.byte1] == memory[wd.byte2]) IP = wd.byte3;
+			break;
+		case cmMPY:
+			if (memory[wd.byte1] > 0) {  /* 1 is positive */
+    			if (memory[wd.byte2] > 0) {  /* 1 and 2 are positive */
+      				if (memory[wd.byte1] > (SHRT_MAX / memory[wd.byte2])) {
+        				OV = true;
+      				}
+    			} 
+				else { /* 1 positive, 2 nonpositive */
+      				if (memory[wd.byte2] < (SHRT_MIN / memory[wd.byte1])) {
+        				OV = true;
+      				}
+    			} /* 1 positive, 2 nonpositive */
+  			} 
+			else { /* 1 is nonpositive */
+    			if (memory[wd.byte2] > 0) { /* 1 is nonpositive, 2 is positive */
+      				if (memory[wd.byte1] < (SHRT_MIN / memory[wd.byte2])) {
+        				OV = true;
+      				}
+    			} 
+				else { /* 1 and 2 are nonpositive */
+      				if ( (memory[wd.byte1] != 0) && (memory[wd.byte2] < (SHRT_MAX / memory[wd.byte1]))) {
+        				OV = true;
+      				}
+    			} /* End if 1 and 2 are nonpositive */
+  			} /* End if 1 is nonpositive */
+
+  			memory[wd.byte3] = memory[wd.byte1] * memory[wd.byte2];
+			break;
+		case cmTRGT:
+			if (memory[wd.byte1] > memory[wd.byte2]) IP = wd.byte3;
+			break;
+		case cmPRST: 
+			std::cout << memory[wd.byte1] << " " << memory[wd.byte2] << " " << memory[wd.byte3] << std::endl;
+			break;
+		default:
+			return cmPRST; //неизвестная инструкция - STOP!
+			break;
+	}
+	return wd.byte0;
 }
 
 void TINYAC::DumpMem() {
@@ -253,12 +358,19 @@ void TINYAC::LoadTest() {
 }
 
 void TINYAC::Do() {
+	for(;;) if (Step()==cmPRST) break;
+}
 
+void TINYAC::Trace() {
+	Step();
+	ViewRegs();
 }
 
 void TINYAC::Console() {
 	for (;;) {
 		std::cout <<"\n-";
+		dir="";
+		parsedDir.clear();
 		std::getline(std::cin,dir);
 		ParseDir();
 		switch(parsedDir[0][0]) {
@@ -317,6 +429,10 @@ void TINYAC::Console() {
 			case 'h':
 			case 'H':
 				Compute();
+				break;
+			case 't':
+			case 'T':
+				Trace();
 				break;
 			case '!':
 				LoadTest();//++
@@ -393,9 +509,137 @@ void TINYAC::Assemble() {
 }
 
 void TINYAC::Unassemble() {
+	std::vector<std::string> programText;
+	std::string programString;
+	std::string buffer;
+	std::array<bool,MEMSIZE> isData {false, false, false, false, false, false, false, false}; //таблица данных
+	bool isPRST {false}; //достигнут ли конец программы - инструкция PRST всегда последняя
+	int lastPRSTaddr {0};
+	Word word {0};
+	_WORD wd;
+	std::vector<int8_t> parsedWord;
 	
+	programText.clear();
+	parsedWord.clear();	//3-2-1-0
+	buffer = "";
+	isPRST = false;
+    // --0 pass
+    // ищем конец программы
+    for (auto adr0 = 0; adr0 < MEMSIZE; adr0++) {
+    	word = memory[adr0]; 
+    	wd.word = word;
+    	parsedWord.clear();
+    	parsedWord.push_back(wd.byte0); 
+		parsedWord.push_back(wd.byte1); 
+		parsedWord.push_back(wd.byte2); 
+		parsedWord.push_back(wd.byte3);
+		if (parsedWord[0] == cmPRST) lastPRSTaddr = adr0;	 
+	}
+	// --1 pass
+    for(auto adr = 0; adr < MEMSIZE; adr++) {
+	// parse word
+		//_WORD wd;
+		word = memory[adr]; //std::cout <<"Adr=" <<adr << " "<< "word="<<word << " ";
+		wd.word = word;
+		parsedWord.clear();
+		parsedWord.push_back(wd.byte0); //std::cout <<"byte0=" << wd.byte0+30 << " ";
+		parsedWord.push_back(wd.byte1); //std::cout <<"byte1=" << wd.byte1+30 << " ";
+		parsedWord.push_back(wd.byte2); //std::cout <<"byte2=" << wd.byte2+30 << " ";
+		parsedWord.push_back(wd.byte3); //std::cout <<"byte3=" << wd.byte3+30 << " ";
+		for(auto idx=0; idx<4; idx++) {
+			parsedWord[idx] = parsedWord[idx] & 0x00F; // обнулить старшую тетраду
+			//parsedWord[idx] = parsedWord[idx] | 0x0F0; // установить в 1 старшую тетраду
+		}
+    // end parse word
+	// parse for instructions/data
+		if (isPRST==false) {
+			switch (parsedWord[0]) {
+				case cmCOPY:
+					isData.at(parsedWord[1]) = true;
+					isData.at(parsedWord[3]) = true;
+					break;
+				case cmADD:
+				case cmDIV:
+				case cmSUB:
+				case cmMPY:
+					isData.at(parsedWord[2]) = true;
+					isData.at(parsedWord[1]) = true;
+					isData.at(parsedWord[3]) = true;
+					break;
+				case cmPRST:
+					if (adr==lastPRSTaddr) isPRST = true;
+					isData.at(parsedWord[2]) = true;
+					isData.at(parsedWord[1]) = true;
+					isData.at(parsedWord[3]) = true;
+					break;
+			}
+		} else isData.at(adr) = true;
+	// end parse for instructions/data
+	// !debug 
+	//for(auto i =0; i <8;i++ ) std:: cout << isData[i] << " ";
+	//std::cout << std::endl;
+	// !end debug
+	}
+    // --2 pass
+    // decoding
+	for(auto adr2 = 0; adr2 < MEMSIZE; adr2++) { // по нулевому адресу ВСЕГДА инструкция
+	 	std::stringstream ss;
+		programString ="";
+	 	buffer="";
+	 	word = memory[adr2];
+		ss << std::setw(2) << std::setfill('0') << adr2 << ":" << std::setw(6) << std::setfill('0') << std::hex << word;
+		ss >> buffer; ss.clear();
+		programString = programString + buffer+"    ";
+	// parse word
+		//_WORD wd;
+		word = memory[adr2];
+		wd.word = word;
+		parsedWord.clear();
+		parsedWord.push_back(wd.byte0);
+		parsedWord.push_back(wd.byte1);
+		parsedWord.push_back(wd.byte2);
+		parsedWord.push_back(wd.byte3);
+		for(auto idx=0; idx<4; idx++) parsedWord[idx] = parsedWord[adr2] & 0x00F; // обнулить старшую тетраду
+		if(isData.at(adr2)==false) { //если инструкция
+			switch (wd.byte0) {
+				case cmCOPY: buffer = "COPY "; break; 
+				case cmADD:  buffer = "ADD ";  break; 
+				case cmDIV:  buffer = "DIV ";  break; 
+				case cmSUB:  buffer = "SUB ";  break; 
+				case cmTREQ: buffer = "TREQ "; break;
+				case cmMPY:  buffer = "MPY ";  break; 
+				case cmTRGT: buffer = "TRGT "; break; 
+				case cmPRST: buffer = "PRST "; break; 
+			}
+			programString = programString + buffer;
+			buffer = "";
+			ss << std::setw(2) << std::setfill('0') << std::hex << wd.byte1+0;
+			ss >> buffer; ss.clear();
+			programString = programString + buffer+' ';
+			buffer = "";
+			ss << std::setw(2) << std::setfill('0') << std::hex << wd.byte2+0;
+			ss >> buffer; ss.clear();
+			programString = programString + buffer+ ' ';
+			buffer = "";
+			ss << std::setw(2) << std::setfill('0') << std::hex << wd.byte3+0;
+			ss >> buffer;ss.clear();
+			programString = programString + buffer;
+			buffer = "";
+		} else {
+			std::stringstream sS;
+			sS << std::setw(6) << std::setfill('0') << std::hex << memory[adr2];
+			buffer = "DEFH ";
+			programString = programString + buffer;
+			sS >> buffer;
+			programString = programString + buffer;
+		}
+		// end parse word
+		programText.push_back(programString);	          
+		}
+    	// end decoding
 	
-
+	//вывод программы на экран
+	for(auto i = 0; i < MEMSIZE; i++) std::cout<< programText.at(i)<<std::endl;
 }
 
 void TINYAC::SetName() {
@@ -652,7 +896,6 @@ void TINYAC::EditMem() {
 	}
 }
 
-
 void TINYAC::Compute() {
 	int first  {0};
 	int second {0};
@@ -680,102 +923,3 @@ void TINYAC::Compute() {
 		      << std::setw(6) << std::setfill(' ') << std::dec << first-second << "D\n";
 	}
 }
-
-/*
-TINIAC - виртуальная машина, моделирующая обшие черты ЭВМ первого поколения.
-
-ОСНОВНЫЕ ХАРАКТЕРИСТИКИ
-VM TINIAC
-----------------------------
-Назначение VM TINIAC				арифметические расчеты с целыми числами
-Интерфейс с пользователем			ввод с консоли, магнитной ленты, вывод на консоль, магнитную ленту, принтер
-Размер оперативной памяти			16 слов
-Размер машинного слова			16 бит
-Представление чисел в памяти		в форме с фиксированной точкой
-Система счисления				двоично-шестнадцатеричная
-Языки программирования			язык машинных команд (ЯМК), Автокод
-Структура команд				трехадресная
-
-TINIAC поддерживает набор команд учебной ЭВМ "Кроха", за исключением команды 07h (111b) ВЫВОД И СТОП, которая заменена парой команд 07h (0111b) STOP и 08h (1000b) PRNT. Добавлены дополнительные команды.
-
-
-МИНИМАЛЬНЫЕ ТРЕБОВАНИЯ
-----------------------------
-Intel 286 compatible
-100 Kb HD space
-16 Mb RAM
-MS-DOS 3.0
-
-
-УСТРОЙСТВО VM TINIAC
-----------------------------
-
-Память
-Память (оперативная память) служит для хранения данных и программы во время работы компьютера. Оперативная память состоит из элементов -
-ячеек. Каждая ячейка имеет свой номер, который называется адресом. В машине TINIAC 16 ячеек памяти, каждая из которых может хранить 16-разрядное значение - машинное слово. Ячейки памяти последовательно адресуются с 00 до 0F. В соответствии с принципом Фон Неймана, если машинное слово попадает в АЛУ, то оно трактуется как число. Внутреннее представление чисел в TINIAC полностью совпадает с представлением чисел в IBM PC. Команды TINIAC поддерживают знаковую целочисленную арифметику. Набор значений находится в диапазоне -32768..+32767 (08000..07FFF). Имеются две основные операции работы с памятью: 
-1. Запись данного в ячейку. ЦП сообщает ОП, что именно надо записать и по какому адресу. При записи в ячейку ее старое содержимое теряется, становится недоступным.
-2. Чтение содержимого ячейки. ЦП передает ОП нужный адрес. Содержимое ячейки с этим адресом считывается и пересылается в ЦП. При чтении содержимое ячейки не изменяется.
-При включении машины все ячейки памяти содержат 0.
-
-Процессор
-Процессор включает в себя следующие устройства:
-АЛУ (арифметическо-логическое устройство) - оно выполняет арифметические и логические операции (например, сложение, вычитание, умно-
-жение, сравнение);
-УУ (устройство управления) - управляет работой процессора.
-Регистры - специальные ячейки, которые находятся внутри процессора.
-В АЛУ имеются следующие регистры:
-1. регистр 1 операнда OP1 разрядностью  16 бит,
-2. регистр 2 операнда OP2 разрядностью 16 бит,
-3. регистр результата (сумматор) SM разрядностью 16 бит.
-При выполнении арифметических команд на эти регистры из памяти считываются операнды, в сумматор помещается результат операции, который затем сохраняется в памяти.
-Регистры УУ:
-1. указатель на инструкцию IP разрядностью 8 бит, во время выполнения текущей команды содержит адрес команды, следующей за выполняемой,
-2. регистр команды CR разрядностью 16 бит (машинное слово), содержит выполняемую команду,
-3. регистры точек разрыва BR1 и BR2 разрядностью 8 бит. В эти регистры записываются с консоли адреса команд. Когда адрес команды в регистре IP равен адресу в регистре BR1 или BR2, процессор переходит в шаговый режим работы и выполнение программы приостанавливается.
-4. регистр признака Омега разрядностью 1 бит, устанавливается после каждой арифметической операции в 1, если результат строго меньше нуля и в 0 в противном случае,
-5. регистр переполнения разрядностью 1 бит, устанавливается в 1, если при выполнении арифметической операции произошло переполнение, сбросить регистр в 0 можно только перезапуском машины.  
-При включении машины все регистры содержат 0.
-
-Команды
-Машинное слово в устройстве управления трактуется как команда и логически подразделяется на 4 части:
-0000-0000-0000-0000
-   ^    ^    ^    ^
-   |    |    |    |
-   |    |    |    --- A3
-   |    |    -------- A2
-   |    ------------- A1
-   ------------------ КОП
-
-КОП - код операции, 4 бита
-А1  - первый исполнительный адрес либо непосредственное значение, 4 бита
-А2  - второй исполнительный адрес либо непосредственное значение, 4 бита
-А3  - третий исполнительный адрес либо непосредственное значение, 4 бита
-
-Для арифметических команд схема выполнения следующая:
-[А1] := [А2] Х [А3]  (здесь вместо 'Х' - любая арифметическая операция)
-
-Ниже приведен список команд:
-Код Мнемоника   Название        Операция                    Операнды                Пример
-00  MOVE        Пересылка       [A3] := [A1]                MOVE [A1]  00  [A3]     00 05 00 02
-01  IADD        Сложение        [A3] := [A1] + [A2]         IADD [A1] [A2] [A3]     01 05 02 0A
-02  IDIV        Деление         [A3] := [A1] / [A2]         IDIV [A1] [A2] [A3]     02 05 02 0A
-03  ISUB        Вычитание       [A3] := [A1] - [A3]         ISUB [A1] [A2] [A3]     03 05 02 0A
-04  TREQ        Переход если =  if [A1] = [A2] IP := A3     TREQ [A1] [A2]  A3      04 05 04 0C
-05  IMPY        Умножение       [A3] := [A1] * [A2]         IMPY [A1] [A2] [A3]     05 05 02 0A
-06  TRGT        Переход если >  if [A1] > [A2] IP := A3     TREQ [A1] [A2]  A3      06 05 04 0C
-07  STOP        Стоп            состояние стоп              STOP  00   00   00      07 00 00 00
-08  PRNT        Печать          печатать [A3]               PRNT  00   00  [A3]     08 00 00 0C       
-09  READ        Чтение ленты    читать с ленты A1 слов      READ  A1   00   A3      09 0F 00 0C
-                                в адрес [A3]     
-0A  WRTE        Запись на ленту писать на ленту A1 слов     WRTE  A1   00   A3      0A 0F 00 0C 
-                                с адреса [A3]
-0B  RWND        Подвод ленты    перемотать ленту на зону A3 RWND  00   00   A3      0B 00 00 01
-0C  TROV        Переход при     if OV IP := A3              TROV  00   00   A3      0C 00 00 0E 
-                переполнении
-0D  TRLT        Переход если <  if [A1] < [A2] IP := A3     TRLT [A1] [A2]  A3      0D 05 04 0C
-0E  NOOP        Нет операции                                NOOP                    0E 00 00 00
-0F  NOOP        Нет операции                                NOOP                    0F 00 00 00
-[A] - операнд трактуется как адрес
-А - операнд трактуется, как непосредственное значение
-00 - операнд игнорируется
-*/
